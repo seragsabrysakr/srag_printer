@@ -1,7 +1,7 @@
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as image_lib;
+import 'package:permission_handler/permission_handler.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:srag_printer/srag_printer.dart';
 
@@ -187,6 +187,14 @@ class _ExampleHomePageState extends State<ExampleHomePage> {
 
   Future<void> _discover() async {
     try {
+      final hasPermissions = await _ensureRuntimePermissions();
+      if (!hasPermissions) {
+        setState(() {
+          _log = 'Required permission was denied. '
+              'Open system settings and allow the requested access.';
+        });
+        return;
+      }
       final devices = await SragPrinterDiscovery.discover(
         request: PrinterDiscoveryRequest(connectionType: _type),
       );
@@ -198,6 +206,31 @@ class _ExampleHomePageState extends State<ExampleHomePage> {
     } catch (error) {
       setState(() => _log = 'Discovery error: $error');
     }
+  }
+
+  Future<bool> _ensureRuntimePermissions() async {
+    if (_type != PrinterConnectionType.bluetooth) return true;
+
+    final permissions = switch (defaultTargetPlatform) {
+      TargetPlatform.android => <Permission>[
+          Permission.bluetoothScan,
+          Permission.bluetoothConnect,
+          Permission.locationWhenInUse,
+        ],
+      TargetPlatform.iOS || TargetPlatform.macOS => <Permission>[
+          Permission.bluetooth,
+        ],
+      _ => <Permission>[],
+    };
+
+    for (final permission in permissions) {
+      if (await permission.isGranted) continue;
+      final status = await permission.request();
+      if (!status.isGranted && !status.isLimited) {
+        return false;
+      }
+    }
+    return true;
   }
 
   Future<void> _printTestImage() async {

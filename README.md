@@ -29,15 +29,6 @@ Many thanks to the maintainers and contributors of these packages.
 - Provides generic receipt widgets as optional helpers.
 - Provides generic device discovery by type/platform.
 
-## What This Package Does Not Do
-
-- It does not generate ZATCA QR codes.
-- It does not calculate tax, discounts, totals, or business rules.
-- It does not depend on `SalesInvoice` or any app-specific model.
-- It does not read `SharedPreferences` or app settings.
-- It does not load your app assets automatically.
-- It does not hardcode vendors such as POSIFLEX or any specific printer model.
-- It does not silently select the first discovered printer by default.
 
 ## Installation
 
@@ -55,6 +46,92 @@ Then import:
 import 'package:srag_printer/srag_printer.dart';
 import 'package:pdf/widgets.dart' as pw;
 ```
+
+## Platform Setup and Permissions
+
+The package sends bytes to printers, but each application owns its platform
+permissions. The example app includes these settings as a reference.
+
+### Android
+
+Add the permissions you need to `android/app/src/main/AndroidManifest.xml`.
+Keep hardware features optional if your app can still use network printing when
+USB or Bluetooth hardware is unavailable.
+
+```xml
+<!-- Network printers, usually raw TCP on port 9100. -->
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+<!-- USB host mode for Android USB printers. -->
+<uses-feature android:name="android.hardware.usb.host" android:required="false" />
+
+<!-- Bluetooth for Android 11 and below. Location is required by Android for BLE scanning. -->
+<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="30" />
+
+<!-- Bluetooth for Android 12+. -->
+<uses-permission
+    android:name="android.permission.BLUETOOTH_SCAN"
+    android:usesPermissionFlags="neverForLocation" />
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+<uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+<uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+```
+
+Runtime permissions are still required before Bluetooth discovery. The example
+uses `permission_handler` to request `bluetoothScan`, `bluetoothConnect`, and
+`locationWhenInUse` on Android.
+
+USB note: Android USB access is device-selection dependent. The OS may show a
+USB permission prompt when a USB transport opens the selected device.
+
+### iOS
+
+For network printers on the local network and BLE discovery/connect, add usage
+descriptions to `ios/Runner/Info.plist`:
+
+```xml
+<key>NSBluetoothAlwaysUsageDescription</key>
+<string>This app uses Bluetooth to discover and connect to BLE thermal printers.</string>
+<key>NSBluetoothPeripheralUsageDescription</key>
+<string>This app uses Bluetooth to discover and connect to BLE thermal printers.</string>
+<key>NSLocalNetworkUsageDescription</key>
+<string>This app connects to network thermal printers on your local network.</string>
+```
+
+iOS does not support generic USB thermal printer access in v1. Classic
+Bluetooth SPP is also not available for generic printers; use network or BLE
+printers that expose writable BLE characteristics.
+
+### macOS
+
+If your macOS app uses the app sandbox, add outbound network and Bluetooth
+entitlements. The example adds these to both debug/profile and release
+entitlements:
+
+```xml
+<key>com.apple.security.network.client</key>
+<true/>
+<key>com.apple.security.device.bluetooth</key>
+<true/>
+```
+
+### Windows
+
+No manifest permissions are required for raw TCP sockets, installed Windows
+printer RAW output, or COM-port access. Users may still need normal OS-level
+access to the selected printer/port, and firewall rules can affect network
+printers.
+
+### Linux
+
+Network printing can work with normal socket access. USB/serial access usually
+depends on system groups and udev rules such as `dialout` or `lp`; configure
+those at the OS level for your target device.
 
 ## Platform Support
 
@@ -261,4 +338,3 @@ Generic USB thermal printing is not supported in v1.
 
 **Does the package generate QR codes?**  
 No. Pass a ready QR image or `pw.Widget`.
-
